@@ -1,11 +1,8 @@
-import Head from 'next/head';
-
-const Header: React.FC = () => (
-  <Head>
-    <title>Hangman Game</title>
-    <meta name="description" content="Hangman Game using Next.js" />
-    <link rel="icon" href="/favicon.ico" />
-  </Head>
-);
-
-export default Header;
+export default function Header() {
+  return (
+    <header className="py-5 text-center">
+      <h1 className="text-3xl font-bold">Jogo da Forca</h1>
+      <p className="text-sm text-gray-500">Next.js + Canvas</p>
+    </header>
+  );
+}
