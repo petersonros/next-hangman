@@ -1,6 +1,7 @@
 "use client";
 
 import Header from "@/components/Header";
+import Scoreboard from "@/components/Scoreboard";
 import StatusBar from "@/components/StatusBar";
 import Canvas from "@/components/Canvas";
 import Hint from "@/components/Hint";
@@ -12,6 +13,7 @@ import { useHangman } from "@/hooks/useHangman";
 
 export default function Home() {
   const {
+    // jogo
     word,
     hint,
     status,
@@ -22,6 +24,9 @@ export default function Home() {
     tryLetter,
     newGame,
     maxAttempts,
+    // placar
+    stats,
+    resetStats,
   } = useHangman();
 
   const disabled = status !== "playing";
@@ -29,16 +34,25 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-4xl px-3 sm:px-4 py-4 space-y-3">
       <Header />
+
+      <Scoreboard
+        wins={stats.wins}
+        losses={stats.losses}
+        games={stats.games}
+        onReset={resetStats}
+      />
+
       <StatusBar
         wrongCount={wrongCount}
         maxAttempts={maxAttempts}
         wrongLetters={wrong}
         status={status}
       />
-      <div className="text-center text-yellow-500">{`Tentativas: ${wrongCount} / ${maxAttempts}`}</div>
+
       <Canvas wrongCount={wrongCount} />
       <Hint hint={hint} />
       <WordDisplay reveal={reveal} />
+
       <Keyboard
         onPick={tryLetter}
         disabled={disabled}

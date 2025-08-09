@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { words } from "@/utils/words";
 
 export type GameStatus = "playing" | "won" | "lost";
 
 const MAX_ATTEMPTS = 6;
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZÇ".split("");
+const STATS_KEY = "hangman:stats";
+
+type Stats = { wins: number; losses: number; games: number };
 
 function pickRandom() {
   return words[Math.floor(Math.random() * words.length)];
@@ -15,42 +18,63 @@ export function useHangman() {
   const [guessed, setGuessed] = useState<string[]>([]);
   const [wrong, setWrong] = useState<string[]>([]);
   const [status, setStatus] = useState<GameStatus>("playing");
-
-  const normalizedWord = useMemo(() => word.toUpperCase(), [word]);
-
-  const usedLetters = useMemo(
-    () => new Set([...guessed, ...wrong]),
-    [guessed, wrong]
-  );
-
-  const reveal = useMemo(() => {
-    return normalizedWord
-      .split("")
-      .map((ch) => (guessed.includes(ch) ? ch : ""));
-  }, [normalizedWord, guessed]);
-
-  const wrongCount = wrong.length;
+  const [stats, setStats] = useState<Stats>({ wins: 0, losses: 0, games: 0 });
+  const scoredRef = useRef(false);
 
   useEffect(() => {
     setWordData(pickRandom());
   }, []);
 
-  // checa vitória/derrota
+  useEffect(() => {
+    try {
+      const raw =
+        typeof window !== "undefined" ? localStorage.getItem(STATS_KEY) : null;
+      if (raw) setStats(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  const normalizedWord = useMemo(() => word.toUpperCase(), [word]);
+  const usedLetters = useMemo(
+    () => new Set<string>([...guessed, ...wrong]),
+    [guessed, wrong]
+  );
+  const reveal = useMemo(
+    () =>
+      normalizedWord.split("").map((ch) => (guessed.includes(ch) ? ch : "")),
+    [normalizedWord, guessed]
+  );
+  const wrongCount = wrong.length;
+
   useEffect(() => {
     if (reveal.every((ch) => ch !== "")) setStatus("won");
   }, [reveal]);
-
   useEffect(() => {
     if (wrongCount >= MAX_ATTEMPTS) setStatus("lost");
   }, [wrongCount]);
 
+  useEffect(() => {
+    if (status === "playing" || scoredRef.current) return;
+
+    setStats((prev) => {
+      const next: Stats =
+        status === "won"
+          ? { wins: prev.wins + 1, losses: prev.losses, games: prev.games + 1 }
+          : { wins: prev.wins, losses: prev.losses + 1, games: prev.games + 1 };
+      try {
+        localStorage.setItem(STATS_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    scoredRef.current = true;
+  }, [status]);
+
   const tryLetter = useCallback(
     (raw: string) => {
       if (status !== "playing") return;
-
       const letter = raw.toUpperCase();
-      if (!LETTERS.includes(letter)) return; // ignora teclas não mapeadas
-      if (usedLetters.has(letter)) return; // já usada
+      if (!LETTERS.includes(letter)) return;
+      if (usedLetters.has(letter)) return;
 
       if (normalizedWord.includes(letter)) {
         setGuessed((prev) => [...prev, letter]);
@@ -66,19 +90,27 @@ export function useHangman() {
     setGuessed([]);
     setWrong([]);
     setStatus("playing");
+    scoredRef.current = false;
   }, []);
 
-  // suporte ao teclado físico
+  const resetStats = useCallback(() => {
+    const empty: Stats = { wins: 0, losses: 0, games: 0 };
+    setStats(empty);
+    try {
+      localStorage.setItem(STATS_KEY, JSON.stringify(empty));
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (status !== "playing") return;
       const k = e.key.toUpperCase();
-      // mapeia Ç em teclados pt-br
       const letter = k === "¸" ? "Ç" : k;
       tryLetter(letter);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tryLetter]);
+  }, [tryLetter, status]);
 
   return {
     word,
@@ -88,10 +120,12 @@ export function useHangman() {
     wrong,
     usedLetters,
     wrongCount,
-    reveal, // array de letras reveladas por posição
+    reveal,
     tryLetter,
     newGame,
     maxAttempts: MAX_ATTEMPTS,
     letters: LETTERS,
+    stats,
+    resetStats,
   };
 }
